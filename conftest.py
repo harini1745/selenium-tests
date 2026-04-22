@@ -8,15 +8,18 @@ from selenium.webdriver.edge.options import Options as EdgeOptions
 
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 
+# Create screenshots folder if it doesn't exist
+os.makedirs("screenshots", exist_ok=True)
+
 def pytest_addoption(parser):
     parser.addoption("--browser", action="store", default="chrome",
-                     help="Browser to run tests on: chrome, firefox, edge")
+                     help="Browser: chrome, firefox, edge")
     parser.addoption("--headless", action="store_true", default=False,
-                     help="Run tests in headless mode")
+                     help="Run headless")
 
 @pytest.fixture
 def driver(request):
-    browser = request.config.getoption("--browser")
+    browser  = request.config.getoption("--browser")
     headless = request.config.getoption("--headless")
 
     if browser == "chrome":
@@ -44,3 +47,17 @@ def driver(request):
     print(f"\nRunning on: {browser.upper()} | headless: {headless}")
     yield d
     d.quit()
+
+# ---- Screenshot on failure ----
+@pytest.hookimpl(tryfirst=True, hookwrapper=True)
+def pytest_runtest_makereport(item, call):
+    outcome = yield
+    report  = outcome.get_result()
+
+    if report.when == "call" and report.failed:
+        driver = item.funcargs.get("driver")
+        if driver:
+            # Save screenshot with test name
+            filename = f"screenshots/{item.name}.png"
+            driver.save_screenshot(filename)
+            print(f"\nScreenshot saved: {filename}")
