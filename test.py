@@ -2,42 +2,51 @@ from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.chrome.options import Options as ChromeOptions
-from selenium.webdriver.firefox.options import Options as FirefoxOptions
-from selenium.webdriver.edge.options import Options as EdgeOptions
 import time
 
-def get_driver(browser):
-    if browser == "chrome":
-        return webdriver.Chrome()
-    elif browser == "firefox":
-        return webdriver.Firefox()
-    elif browser == "edge":
-        return webdriver.Edge()
-    else:
-        raise ValueError(f"Unknown browser: {browser}")
+driver = webdriver.Chrome()
+driver.get("https://books.toscrape.com")
 
-def test_login(browser):
-    print(f"\n--- Testing on {browser.upper()} ---")
-    driver = get_driver(browser)
+wait = WebDriverWait(driver, 10)
 
+all_books = []
+page = 1
+
+while True:
+    print(f"\n--- Scraping page {page} ---")
+    wait.until(EC.presence_of_element_located((By.CLASS_NAME, "product_pod")))
+
+    # Get all books on current page
+    books = driver.find_elements(By.CLASS_NAME, "product_pod")
+
+    for book in books:
+        title  = book.find_element(By.TAG_NAME, "h3").find_element(By.TAG_NAME, "a").get_attribute("title")
+        price  = book.find_element(By.CLASS_NAME, "price_color").text
+        rating = book.find_element(By.CSS_SELECTOR, "p.star-rating").get_attribute("class").split()[-1]
+        all_books.append({"title": title, "price": price, "rating": rating})
+        print(f"  {title[:40]} | {price} | {rating} stars")
+
+    # Check if there's a next page
     try:
-        driver.get("https://practicetestautomation.com/practice-test-login/")
-        wait = WebDriverWait(driver, 20)
+        next_btn = driver.find_element(By.CLASS_NAME, "next")
+        next_btn.find_element(By.TAG_NAME, "a").click()
+        page += 1
+        time.sleep(2)
 
-        wait.until(EC.visibility_of_element_located((By.ID, "username"))).send_keys("student")
-        driver.find_element(By.ID, "password").send_keys("Password123")
-        driver.find_element(By.ID, "submit").click()
-        time.sleep(3)
+        # Stop after 3 pages for demo
+        if page > 3:
+            print("\nStopping at page 3 for demo...")
+            break
+    except:
+        print("\nNo more pages!")
+        break
 
-        body = driver.find_element(By.TAG_NAME, "body").text
-        if "Congratulations" in body:
-            print(f"✓ PASS on {browser}")
-        else:
-            print(f"✗ FAIL on {browser}")
-    finally:
-        driver.quit()
+print(f"\n=== Total books scraped: {len(all_books)} ===")
+print(f"Price range: {min(b['price'] for b in all_books)} - {max(b['price'] for b in all_books)}")
 
-# Run on all three browsers
-for browser in ["chrome", "firefox", "edge"]:
-    test_login(browser)
+# Find most common rating
+from collections import Counter
+ratings = Counter(b['rating'] for b in all_books)
+print(f"Ratings breakdown: {dict(ratings)}")
+
+driver.quit()
